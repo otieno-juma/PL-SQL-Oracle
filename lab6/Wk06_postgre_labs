@@ -1,0 +1,65 @@
+CREATE FUNCTION verify_date
+  ( IN pv_date_in  VARCHAR(10)) RETURNS BOOLEAN AS
+  $$
+  DECLARE
+    /* Local return variable. */
+    lv_retval  BOOLEAN := FALSE;
+  BEGIN
+    /* Check for a YYYY-MM-DD or YYYY-MM-DD string. */
+    IF REGEXP_MATCH(pv_date_in,'^[0-9]{2,4}-[0-9]{2,2}-[0-9]{2,2}$') IS NOT NULL THEN
+      /* Case statement checks for 28 or 29, 30, or 31 day month. */
+      CASE
+        /* Valid 31 day month date value. */
+        WHEN (LENGTH(pv_date_in) = 10 AND
+              SUBSTRING(pv_date_in,6,2) IN ('01','03','05','07','08','10','12') AND
+              TO_NUMBER(SUBSTRING(pv_date_in,9,2),'99') BETWEEN 1 AND 31) OR
+             (LENGTH(pv_date_in) = 8 AND
+              SUBSTRING(pv_date_in,4,2) IN ('01','03','05','07','08','10','12') AND
+              TO_NUMBER(SUBSTRING(pv_date_in,7,2),'99') BETWEEN 1 AND 31) THEN 
+          lv_retval := true;
+ 
+        /* Valid 30 day month date value. */
+        WHEN (LENGTH(pv_date_in) = 10 AND
+              SUBSTRING(pv_date_in,6,2) IN ('04','06','09','11') AND
+              TO_NUMBER(SUBSTRING(pv_date_in,9,2),'99') BETWEEN 1 AND 30) OR
+             (LENGTH(pv_date_in) = 8 AND
+              SUBSTRING(pv_date_in,4,2) IN ('04','06','09','11') AND
+              TO_NUMBER(SUBSTRING(pv_date_in,7,2),'99') BETWEEN 1 AND 30) THEN 
+          lv_retval := true;
+ 
+        /* Valid 28 or 29 day month date value for February. */
+        WHEN (LENGTH(pv_date_in) = 10 AND SUBSTRING(pv_date_in,6,2) = '02') OR
+             (LENGTH(pv_date_in) =  8 AND SUBSTRING(pv_date_in,4,2) = '02') THEN
+          /* Verify 2-digit or 4-digit year. */
+          IF (LENGTH(pv_date_in) = 10 AND
+              MOD(TO_NUMBER(SUBSTRING(pv_date_in,1,4),'9999'),4) = 0) OR
+             (LENGTH(pv_date_in) =  8 AND
+              MOD(TO_NUMBER(CONCAT('20',SUBSTRING(pv_date_in,1,2)),'9999'),4) = 0) THEN
+            IF TO_NUMBER(SUBSTRING(pv_date_in,(LENGTH(pv_date_in) -1),2),'99')
+                 BETWEEN 1 AND 29 THEN
+              lv_retval := true;
+            END IF;
+          ELSE /* Not a leap year. */
+            IF TO_NUMBER(SUBSTRING(pv_date_in,(LENGTH(pv_date_in) -1),2),'99')
+              BETWEEN 1 AND 28 THEN
+                lv_retval := true;
+            /*
+             *  The condition does not require evaluation because the default
+             *  return value is false; however, it is provided to show you
+             *  what happens when a leap year is not found and the day is
+             *  outside the range of 1 to 28.
+            */
+            -- ELSE
+            --   RAISE NOTICE '[% %]','Not a non-leap year day:',
+            --                         SUBSTRING(pv_date_in,(LENGTH(pv_date_in) - 1),2);
+            END IF;
+          END IF;
+        ELSE
+          NULL;
+      END CASE;
+    END IF;
+ 
+    /* Return date. */
+    RETURN lv_retval;
+  END;
+$$ LANGUAGE plpgsql;
